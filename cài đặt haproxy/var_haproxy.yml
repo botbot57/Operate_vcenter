@@ -1,0 +1,67 @@
+log_server: "127.0.0.1"
+global_maxconn: 4000
+default_retries: 3
+timeout_http_request: "10s"
+timeout_queue: "1m"
+timeout_connect: "10s"
+timeout_client: "1m"
+timeout_server: "1m"
+timeout_http_keep_alive: "10s"
+timeout_check: "10s"
+default_maxconn: 3000
+
+listeners:
+  - name: api-server-6443
+    port: 6443
+    mode: tcp
+    options:
+      - "httpchk GET /readyz HTTP/1.0"
+      - "log-health-checks"
+    balance: roundrobin
+    servers:
+      - name: bootstrap
+        address: 192.168.0.119:6443
+        weight: 1
+        check_inter: "10s"
+        backup: true
+      - name: master0
+        address: 192.168.0.120:6443
+      - name: master1
+        address: 192.168.0.121:6443
+      - name: master2
+        address: 192.168.0.122:6443
+
+  - name: ingress-router-443
+    port: 443
+    mode: tcp
+    balance: source
+    servers:
+      - name: worker0
+        address: 192.168.0.123:443
+      - name: worker1
+        address: 192.168.0.124:443
+  - name: machine-config-server-22623
+    port: 22623
+    mode: tcp
+    servers:
+      - name: bootstrap
+        address: 192.168.0.119:6443
+        weight: 1
+        check_inter: "10s"
+        backup: true
+      - name: master0
+        address: 192.168.0.120:6443
+      - name: master1
+        address: 192.168.0.121:6443
+      - name: master2
+        address: 192.168.0.122:6443
+  - name: ingress-router-80
+    port: 80
+    mode: tcp
+    balance: source
+    servers:
+      - name: worker0
+        address: 192.168.0.123:80
+      - name: worker1
+        address: 192.168.0.124:80
+

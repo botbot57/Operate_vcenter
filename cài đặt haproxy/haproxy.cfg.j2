@@ -1,0 +1,39 @@
+global
+  log         {{ log_server }} local2
+  pidfile     /var/run/haproxy.pid
+  maxconn     {{ global_maxconn }}
+  daemon
+
+defaults
+  mode            http
+  log             global
+  option          dontlognull
+  option http-server-close
+  option          redispatch
+  retries                 {{ default_retries }}
+  timeout http-request    {{ timeout_http_request }}
+  timeout queue           {{ timeout_queue }}
+  timeout connect         {{ timeout_connect }}
+  timeout client          {{ timeout_client }}
+  timeout server          {{ timeout_server }}
+  timeout http-keep-alive {{ timeout_http_keep_alive }}
+  timeout check           {{ timeout_check }}
+  maxconn                 {{ default_maxconn }}
+
+{% for listener in listeners %}
+listen {{ listener.name }}
+  bind *:{{ listener.port }}
+  mode {{ listener.mode }}
+  {% if listener.options is defined %}
+  {% for option in listener.options %}
+  option {{ option }}
+  {% endfor %}
+  {% endif %}
+  {% if listener.balance is defined %}
+  balance {{ listener.balance }}
+  {% endif %}
+  {% for server in listener.servers %}
+  server {{ server.name }} {{ server.address }} weight {{ server.weight | default(1) }} check inter {{ server.check_inter | default('10s') }}
+  {% endfor %}
+{% endfor %}
+
