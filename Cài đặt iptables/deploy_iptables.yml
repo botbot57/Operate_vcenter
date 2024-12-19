@@ -1,0 +1,26 @@
+---
+- name: Deploy and configure iptables
+  hosts: all
+  become: yes
+  vars_files:
+    - var_iptables.yml
+  tasks:
+
+    - name: Install iptables
+      ansible.builtin.yum:
+        name: iptables-services
+        state: present
+
+    - name: Deploy HAProxy configuration
+      ansible.builtin.template:
+        src: iptables.cfg.j2
+        dest: /etc/sysconfig/iptables
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart HAProxy to apply changes
+      ansible.builtin.systemd:
+        name: iptables
+        enabled: true
+        state: restarted

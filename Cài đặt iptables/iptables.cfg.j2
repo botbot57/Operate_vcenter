@@ -1,0 +1,25 @@
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# loopback interface
+-A INPUT -i lo -j ACCEPT
+
+# INPUT Rules
+{% for rule in INPUT.rules %}
+-A INPUT -p {{ rule.protocol }} --dport {{ rule.port }} -s {{ rule.ip }} -j ACCEPT
+{% endfor %}
+
+# OUTPUT Rules
+{% for rule in OUTPUT.rules %}
+-A OUTPUT -p {{ rule.protocol }} --dport {{ rule.port }} -d {{ rule.ip }} -j ACCEPT
+{% endfor %}
+# ICMP (ping)
+-A INPUT -p icmp -j ACCEPT
+
+# block other service
+-A INPUT -j DROP
+
+COMMIT
+
