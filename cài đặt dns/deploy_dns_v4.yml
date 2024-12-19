@@ -1,0 +1,70 @@
+---
+- name: Configure DNS server
+  hosts: all
+  become: true
+  vars_files:
+    - var_dns.yml
+  tasks:
+    - name: Install BIND
+      yum:
+        name: bind
+        state: present
+
+    - name: Ensure listen-on includes all interfaces
+      replace:
+        path: /etc/named.conf
+        regexp: 'listen-on port 53 { 127.0.0.1; };'
+        replace: 'listen-on port 53 { any; };'
+
+    - name: Ensure allow-query allows all by default
+      replace:
+        path: /etc/named.conf
+        regexp: 'allow-query     { localhost; };'
+        replace: 'allow-query     { any; };'
+    - name: Add zone configuration to named.conf
+      blockinfile:
+        path: /etc/named.conf
+        marker: "# {mark} ANSIBLE-MANAGED ZONE CONFIGURATION"
+        block: |
+          zone "{{ domain_name }}" {
+              type master;
+              file "{{ zone_file }}";
+          };
+          zone "{{ reverse_zone }}" {
+              type master;
+              file "{{ reverse_zone_file }}";
+          };
+    - name: Create zone file
+      copy:
+        dest: "{{ zone_file }}"
+        content: |
+          $TTL 86400
+          @   IN  SOA ns.{{ domain_name }}. admin.{{ domain_name }}. (
+              {{ zone_serial }} ; Serial
+              3600       ; Refresh
+              1800       ; Retry
+              1209600    ; Expire
+              86400 )    ; Minimum TTL
+          @   IN  NS ns.{{ domain_name }}.
+          ns  IN  A  {{ ns_ip }}
+          {{ subdomain }} IN  A  {{ subdomain_ip }}
+    - name: Create reverse zone file
+      copy:
+        dest: "{{ reverse_zone_file }}"
+        content: |
+          $TTL 86400
+          @   IN  SOA ns.{{ domain_name }}. admin.{{ domain_name }}. (
+              {{ zone_serial }} ; Serial
+              3600       ; Refresh
+              1800       ; Retry
+              1209600    ; Expire
+              86400 )    ; Minimum TTL
+          @   IN  NS ns.{{ domain_name }}.
+          {{ reverse_ip }} IN PTR {{ subdomain }}.{{ domain_name }}.
+
+    - name: Ensure BIND service is running
+      service:
+        name: named
+        state: restarted
+        enabled: true
+

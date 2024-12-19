@@ -1,0 +1,9 @@
+domain_name: example.com
+ns_ip: 192.168.0.117
+reverse_zone: 0.168.192.in-addr.arpa
+zone_file: "/var/named/forward.{{ domain_name }}"
+reverse_zone_file: "/var/named/reverse.{{ domain_name }}"
+zone_serial: "{{ lookup('pipe', 'date +%Y%m%d%H') }}"
+reverse_ip: "115"
+subdomain_ip: 192.168.0.115
+subdomain: vcenter
