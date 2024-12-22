@@ -1,0 +1,7 @@
+vm_list:
+  - name: "VM1"
+    datastore: "datastore1"
+  - name: "VM2"
+    datastore: "datastore2"
+  - name: "VM3"
+    datastore: "datastore3"
