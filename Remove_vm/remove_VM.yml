@@ -4,6 +4,7 @@
   gather_facts: no
   vars_files:
     - vars.yml
+    - var_remove_vm.yml
   tasks:
     - name: deletevm
       community.vmware.vmware_guest:
