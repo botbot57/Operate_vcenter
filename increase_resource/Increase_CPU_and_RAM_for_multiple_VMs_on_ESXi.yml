@@ -1,0 +1,64 @@
+---
+- name: Increase RAM and CPU for VMware virtual machines
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml  
+    - var_resource_vm.yml
+  tasks:
+    - name: Power off VM
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+        folder: "{{ folder_vm }}"
+        state: poweredoff
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+
+    - name: Enable CPU and Memory Hot Add
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+        folder: "{{ folder_vm }}"
+        hardware:
+          hotadd_memory: true
+          hotadd_cpu: true
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+
+    - name: Update VM resources (RAM and CPU)
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+        folder: "{{ folder_vm }}"
+        hardware:
+          memory_mb: "{{ item.memory_mb }}"
+          num_cpus: "{{ item.num_cpus }}"
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+
+    - name: Power on VM
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+        folder: "{{ folder_vm }}"
+        state: poweredon
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+

@@ -1,0 +1,23 @@
+- name: Increase disk size for VM on ESXi
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Increase disk size for the VM
+      community.vmware.vmware_guest_disk:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+        disk:
+          - size_gb: "{{ new_disk_size }}"  
+            type: "thin"  
+            datastore: "{{ datastore_name }}"  
+            controller_number: 0  
+            unit_number: 1  
+      delegate_to: localhost
+      loop: "{{ vm_list }}"
+

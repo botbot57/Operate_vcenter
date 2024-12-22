@@ -1,0 +1,12 @@
+vm_list:
+  - name: "VM1"
+	vm_cpu: 1
+    vm_memory: 6
+  - name: "VM2"
+	vm_cpu: 4
+    vm_memory: 6
+    
+  - name: "VM3"
+	vm_cpu: 3
+    vm_memory: 3	
+
