@@ -1,0 +1,103 @@
+- block:
+    - name: Retrieve the list of datastores
+      community.vmware.vmware_host_facts:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        esxi_hostname: "{{ item.ip }}"
+      register: host_facts
+      loop: "{{ host_esxi }}"
+
+    - name: Debug host_facts
+      debug:
+        var: host_facts
+
+    - name: Collect datastore free space information and host IP address
+      set_fact:
+        datastore_info: >-
+          {{
+            (datastore_info | default([])) + [{
+              "ip": item.ansible_facts.ansible_all_ipv4_addresses[0],
+              "datastore_free": item.ansible_facts.ansible_datastore[0].free,
+              "datastore_name": item.ansible_facts.ansible_datastore[0].name
+            }]
+          }}
+      loop: "{{ host_facts.results }}"
+      when: item.ansible_facts.ansible_all_ipv4_addresses | length > 0 and item.ansible_facts.ansible_datastore | length > 0
+
+    - name: Convert free space from GB to number (float)
+      set_fact:
+        datastore_info_float: "{{ datastore_info | map(attribute='datastore_free') | map('regex_replace', ' GB', '') | map('float') | list }}"
+
+    - name: Sort datastore_info by free space from largest to smallest
+      set_fact:
+        sorted_datastore_info: "{{ datastore_info | zip(datastore_info_float) | sort(attribute=1, reverse=true) | map('first') | list }}"
+
+    - name: Print sorted datastore list
+      debug:
+        msg: "{{ sorted_datastore_info }}"
+
+    - name: Run Python script with temporary file
+      shell: >
+        python3 get_esxi_cpu_info.py --vcenter_host "{{ vcenter_hostname }}" --vcenter_user "{{ vcenter_username }}" --vcenter_password "{{ vcenter_password }}"  --esxi_host "{{ item.ip }}"
+#      when: item['cpu_usage'] < 50 and item['memory_usage'] < 50
+      loop: "{{ sorted_datastore_info }}"
+      register: cpu_info
+    - name: Parse CPU and memory usage from stdout
+      set_fact:
+        cpu_memory_usage: "{{ cpu_memory_usage | default([]) + [{
+          'ip': item.item.ip,
+          'datastore_name': item.item.datastore_name,
+          'datastore_free': item.item.datastore_free,
+          'cpu_usage': (item.stdout | from_json).cpu_usage,
+          'memory_usage': (item.stdout | from_json).memory_usage
+        }] }}"
+      loop: "{{ cpu_info.results }}"
+      when: item.stdout is defined
+
+    - name: Check CPU and memory usage
+      debug:
+        msg: "CPU usage: {{ item['cpu_usage'] }}%, Memory usage: {{ item['memory_usage'] }}%"
+      when: item['cpu_usage'] < 50 and item['memory_usage'] < 50
+      loop: "{{ cpu_memory_usage }}"
+      register: cpu_memory_check
+
+    - name: Collect datastore name from successful results
+      set_fact:
+        first_datastore: "{{ cpu_memory_check.results | selectattr('item.cpu_usage', 'lt', 50) | selectattr('item.memory_usage', 'lt', 50) | map(attribute='item.datastore_name') | list }}"
+        datastore_free: "{{ cpu_memory_check.results | selectattr('item.cpu_usage', 'lt', 50) | selectattr('item.memory_usage', 'lt', 50) | map(attribute='item.datastore_free') | list }}"
+#      register: datastore_free
+#    - name: Check if datastore has enough free space
+#      fail:
+#        msg: "Not enough free space on datastore {{ selected_datastore.name }}. It has {{ selected_datastore.freeSpace | human_readable }} free, but at least {{ min_free_space | human_readable }} is required."
+#      when: datastore_free.datastore_free < 20
+
+
+    - name: Clone VM
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ datacenter_name }}"
+        folder: "Discovered virtual machine"
+        state: poweredon
+#        resource_pool: "{{ resource_pool }}"
+        name: "{{ item.name }}"
+        template: "redhat89"
+        hardware:
+          memory_mb: "{{ item.memory_mb }}"
+          num_cpus: "{{ item.num_cpus }}"
+        datastore: "{{ first_datastore }}"
+        networks:
+          - name: "{{ item.network }}"
+            ip: "{{ item.ip }}"
+            netmask: "{{ item.netmask }}"
+            gateway: "{{ item.gateway }}"
+        wait_for_ip_address: yes
+  rescue:
+    - name: Log VM creation failure
+      debug:
+        msg: "Skipping creation of VM {{ item.name }} due to insufficient datastore space."
+
